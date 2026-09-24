@@ -18,18 +18,24 @@ from x402.mechanisms.lnbtc.exact.server import ExactLnbtcScheme as LightningServ
 # payer and receiver implement the adapter protocols. Each binding callback
 # independently captures the current actual request; see the rules below.
 client = x402ClientSync().register(MAINNET, LightningClient(payer, client_binding))
-client.set_spend_controls({
-    "allowed_assets": [{
-        "network": MAINNET,
-        "asset": "BTC",
-        "max_amount_per_payment": "25000",  # 25 sats, in millisatoshis
-    }],
-})
+client.set_spend_controls(
+    {
+        "allowed_assets": [
+            {
+                "network": MAINNET,
+                "asset": "BTC",
+                "max_amount_per_payment": "25000",  # 25 sats, in millisatoshis
+            }
+        ],
+    }
+)
 facilitator = x402FacilitatorSync().register(
-    [MAINNET], LightningFacilitator(SQLiteReplayStore("lightning-replay.sqlite3")),
+    [MAINNET],
+    LightningFacilitator(SQLiteReplayStore("lightning-replay.sqlite3")),
 )
 server = x402ResourceServerSync(facilitator).register(
-    MAINNET, LightningServer(receiver, server_binding, allow_invoice=issuance_allowed),
+    MAINNET,
+    LightningServer(receiver, server_binding, allow_invoice=issuance_allowed),
 )
 server.initialize()
 ```
