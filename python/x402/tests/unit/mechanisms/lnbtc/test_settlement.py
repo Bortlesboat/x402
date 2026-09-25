@@ -121,6 +121,18 @@ def test_article_substitution(proof, facilitator, echo):
         ({"date": NOW + 61}, "invoice_created_in_future"),
     ],
 )
+def test_invoice_created_at_clock_skew_boundary_is_valid(proof, tmp_path):
+    """Spec: creation time equal to now + clock skew is valid; one second later is not."""
+    payload, requirements = proof
+    payload.accepted.extra["invoice"] = invoice(
+        requirements.extra["requestHash"],
+        amount=int(requirements.amount),
+        date=NOW + 60,
+    )
+    facility = ExactLnbtcScheme(SQLiteReplayStore(tmp_path / "skew.db"), clock=lambda: NOW)
+    assert facility.settle(payload, requirements).success
+
+
 def test_signed_invoice_mismatches(proof, facilitator, kwargs, reason):
     payload, requirements = proof
     options = {"amount": int(requirements.amount), **kwargs}
