@@ -121,6 +121,14 @@ def test_article_substitution(proof, facilitator, echo):
         ({"date": NOW + 61}, "invoice_created_in_future"),
     ],
 )
+def test_signed_invoice_mismatches(proof, facilitator, kwargs, reason):
+    payload, requirements = proof
+    options = {"amount": int(requirements.amount), **kwargs}
+    payload.accepted.extra["invoice"] = invoice(requirements.extra["requestHash"], **options)
+    payload.payload["preimage"] = PREIMAGE
+    assert facilitator.settle(payload, requirements).error_reason == "invalid_exact_lnbtc_" + reason
+
+
 def test_invoice_created_at_clock_skew_boundary_is_valid(proof, tmp_path):
     """Spec: creation time equal to now + clock skew is valid; one second later is not."""
     payload, requirements = proof
@@ -129,16 +137,9 @@ def test_invoice_created_at_clock_skew_boundary_is_valid(proof, tmp_path):
         amount=int(requirements.amount),
         date=NOW + 60,
     )
+    payload.payload["preimage"] = PREIMAGE
     facility = ExactLnbtcScheme(SQLiteReplayStore(tmp_path / "skew.db"), clock=lambda: NOW)
     assert facility.settle(payload, requirements).success
-
-
-def test_signed_invoice_mismatches(proof, facilitator, kwargs, reason):
-    payload, requirements = proof
-    options = {"amount": int(requirements.amount), **kwargs}
-    payload.accepted.extra["invoice"] = invoice(requirements.extra["requestHash"], **options)
-    payload.payload["preimage"] = PREIMAGE
-    assert facilitator.settle(payload, requirements).error_reason == "invalid_exact_lnbtc_" + reason
 
 
 @pytest.mark.parametrize(
