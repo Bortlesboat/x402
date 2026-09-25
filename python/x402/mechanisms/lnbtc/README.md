@@ -2,6 +2,8 @@
 
 The `exact` mechanism implements the accepted [BOLT11 upfront scheme](../../../../specs/schemes/exact/scheme_exact_lnbtc.md) for Bitcoin mainnet and testnet. Install its optional dependencies with `pip install 'x402[lightning]'`.
 
+Use Python 3.10–3.13 for the Lightning extra. Its BOLT11 dependency uses `coincurve`, whose current release cannot build on Python 3.14 ([upstream issue](https://github.com/ofek/coincurve/issues/219)). The all-extras CI job uses Python 3.13 so it exercises Lightning as well as the other mechanisms.
+
 A receiver issues a fresh invoice bound to the requested operation. A payer adapter pays it and returns the preimage. The facilitator validates that proof locally, then atomically records its payment hash before the protected handler runs. Settlement does not move funds: the Lightning payment has already completed. The `upfront` flow does not call `/verify` and does not promise a refund if the handler fails.
 
 ## Adapters and registration
