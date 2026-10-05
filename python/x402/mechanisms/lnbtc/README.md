@@ -54,6 +54,7 @@ For HTTP, call `http_request_binding(method, url, public_origin=..., body=raw_by
 
 - Preserve method case, percent escapes, query order and raw content bytes after transfer decoding but before decompression or JSON parsing. A retry must preserve those bytes.
 - Validate the public origin against trusted configuration. Trust forwarding headers only from configured proxies. Framework URL reconstruction must preserve the exact public target URI; otherwise reject the operation.
+- Pass the actual `Host`, `:authority` and forwarding headers when a framework uses them to construct the URL. The binding rejects malformed authority/scheme values and requires the URL authority to match a validated header when supplied. This syntax check does not make an untrusted proxy header trustworthy.
 - Configure a sorted, lowercase list of **every** header affecting operation, content interpretation or account selection, even when absent. This often includes `authorization`, `content-type`, `cookie` and `range`. Exclude `payment-signature`. Supply repeated fields in received order. Empty and absent values differ.
 - Emit `PaymentRequired.resource.url` equal to the bound URL. The registered client hook checks that envelope before paying, and the server hook checks the actual request and payload URL before settlement.
 

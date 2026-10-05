@@ -90,6 +90,68 @@ def test_invalid_http_inputs_fail_closed(kwargs):
         http(**kwargs)
 
 
+@pytest.mark.parametrize("name", ["Host", ":authority", "X-Forwarded-Host"])
+@pytest.mark.parametrize(
+    "authority",
+    [
+        "api.example.com/article/A?q=",
+        "api.example.com?query=",
+        "api.example.com#fragment",
+        "api.example.com\\other",
+        "user@api.example.com",
+        "api.example.com:bad",
+        "api.example.com:65536",
+        "api.example.com%zz",
+        "foo[::1]bar",
+        "api.example.com\r\n",
+        "",
+    ],
+)
+def test_authority_headers_cannot_inject_a_request_target(name, authority):
+    with pytest.raises(ValueError, match="request_binding"):
+        http(headers=[(name, authority)])
+
+
+def test_reconstructed_authority_must_match_a_validated_header():
+    with pytest.raises(ValueError, match="request_mismatch"):
+        http(headers=[("Host", "other.example.com")])
+    with pytest.raises(ValueError, match="request_binding"):
+        http(headers=[("Host", "api.example.com"), ("X-Forwarded-Host", "bad/path")])
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        [("Host", "API.EXAMPLE.COM")],
+        [("Host", "api.example.com:443")],
+        [(":authority", "api.example.com")],
+        [("Host", "internal:8080"), ("X-Forwarded-Host", "api.example.com, proxy:8080")],
+    ],
+)
+def test_valid_authority_headers_preserve_the_published_hash(headers):
+    assert http(headers=headers).digest == http().digest
+
+
+@pytest.mark.parametrize("proto", ["https://api.example.com/path?", "https\r\n", "https, "])
+def test_forwarded_scheme_cannot_inject_a_request_target(proto):
+    with pytest.raises(ValueError, match="request_binding"):
+        http(headers=[("Host", "api.example.com"), ("X-Forwarded-Proto", proto)])
+
+
+def test_valid_forwarded_scheme_hops_preserve_the_published_hash():
+    assert (
+        http(headers=[("Host", "api.example.com"), ("X-Forwarded-Proto", "https, http")]).digest
+        == http().digest
+    )
+
+
+def test_bracketed_ipv6_authority_matches_without_rewriting_the_target():
+    url = "https://[::1]:8443/article/A?x=%2F"
+    assert http_request_binding(
+        "GET", url, public_origin="https://[::1]:8443", headers=[("Host", "[::1]:8443")]
+    ) == http_request_binding("GET", url, public_origin="https://[::1]:8443")
+
+
 @pytest.mark.parametrize(
     "url",
     [

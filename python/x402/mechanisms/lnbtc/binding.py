@@ -16,6 +16,10 @@ from .constants import invalid
 _TOKEN = re.compile(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+")
 _URI = re.compile(r"[A-Za-z0-9._~:/?\[\]@!$&'()*+,;=%-]+")
 _HEX = re.compile(r"[0-9a-f]{64}")
+_AUTHORITY = re.compile(
+    r"(?:\[[^\[\]]+\]|(?:[A-Za-z0-9._~!$&'()*+,;=-]|%[0-9A-Fa-f]{2})+)(?::[0-9]*)?"
+)
+_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*")
 
 
 def canonical(value: Any) -> bytes:
@@ -78,6 +82,17 @@ def validate_params(profile: Any, params: Any) -> None:
         raise invalid("request_binding")
 
 
+def _http_authority(value: str, scheme: str) -> tuple[str, int]:
+    if not _AUTHORITY.fullmatch(value):
+        raise invalid("request_binding")
+    uri = f"{scheme}://{value}"
+    validate_uri(uri, http=True)
+    parts = urlsplit(uri)
+    if parts.netloc != value or parts.hostname is None:
+        raise invalid("request_binding")
+    return parts.hostname.lower(), parts.port or (443 if scheme == "https" else 80)
+
+
 def validate_binding(extra: dict[str, Any]) -> None:
     digest = extra.get("requestHash")
     if not isinstance(digest, str) or not _HEX.fullmatch(digest):
@@ -132,16 +147,30 @@ def http_request_binding(
     params = {"headers": list(bound_headers)}
     validate_params("http:1", params)
     selected: dict[str, list[str]] = {name: [] for name in bound_headers}
+    authorities = []
     for name, value in headers:
-        if not isinstance(name, str) or not _TOKEN.fullmatch(name):
+        if not isinstance(name, str) or (name != ":authority" and not _TOKEN.fullmatch(name)):
             raise invalid("request_binding")
         name = name.lower()
+        if name in ("host", ":authority", "x-forwarded-host", "x-forwarded-proto"):
+            if not isinstance(value, str):
+                raise invalid("request_binding")
+            values = value.split(",") if name.startswith("x-forwarded-") else [value]
+            for item in values:
+                item = item.strip(" \t")
+                if name == "x-forwarded-proto":
+                    if not _SCHEME.fullmatch(item):
+                        raise invalid("request_binding")
+                else:
+                    authorities.append(_http_authority(item, target.scheme))
         if name in selected:
             if not isinstance(value, str) or any(
                 (ord(char) < 32 and char != "\t") or ord(char) > 126 for char in value
             ):
                 raise invalid("request_binding")
             selected[name].append(value.strip(" \t"))
+    if authorities and _http_authority(target.netloc, target.scheme) not in authorities:
+        raise invalid("request_mismatch")
     fields = []
     for name, values in selected.items():
         encoded = b"\x01" + ", ".join(values).encode("ascii") if values else b"\x00"

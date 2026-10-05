@@ -230,7 +230,7 @@ def test_flask_handler_runs_only_after_single_successful_settlement(tmp_path):
     PaymentMiddleware(
         app,
         {
-            "GET /article/A": {
+            f"GET /article/{article}": {
                 "accepts": {
                     "scheme": "exact",
                     "network": MAINNET,
@@ -239,28 +239,43 @@ def test_flask_handler_runs_only_after_single_successful_settlement(tmp_path):
                     "maxTimeoutSeconds": 300,
                 }
             }
+            for article in ("A", "B")
         },
         server,
         sync_facilitator_on_start=False,
     )
 
-    @app.get("/article/A")
-    def article():
-        handled.append(True)
-        return {"article": "A"}
+    @app.get("/article/<article>")
+    def article(article):
+        handled.append(article)
+        return {"article": article}
 
     browser = app.test_client()
-    unpaid = browser.get(URL)
+    paid_url = URL + "?q=/article/B"
+    unpaid = browser.get(paid_url)
     assert unpaid.status_code == 402
     assert handled == []
     challenge = decode_payment_required_header(unpaid.headers["PAYMENT-REQUIRED"])
-    client = sdk_client().register(MAINNET, Client(Payer(receiver), binding, clock=lambda: NOW))
+    client = sdk_client().register(
+        MAINNET,
+        Client(
+            Payer(receiver),
+            lambda: http_request_binding("GET", paid_url, public_origin="https://api.example.com"),
+            clock=lambda: NOW,
+        ),
+    )
     payload = client.create_payment_payload(challenge)
     header = encode_payment_signature_header(payload)
-    paid = browser.get(URL, headers={"PAYMENT-SIGNATURE": header})
+    spoofed = browser.get(
+        URL[:-1] + "B",
+        headers={"Host": "api.example.com/article/A?q=", "PAYMENT-SIGNATURE": header},
+    )
+    assert spoofed.status_code >= 400
+    assert handled == []
+    paid = browser.get(paid_url, headers={"PAYMENT-SIGNATURE": header})
     assert paid.status_code == 200, paid.data
-    assert len(handled) == 1
-    replayed = browser.get(URL, headers={"PAYMENT-SIGNATURE": header})
+    assert handled == ["A"]
+    replayed = browser.get(paid_url, headers={"PAYMENT-SIGNATURE": header})
     assert replayed.status_code == 402
     assert len(handled) == 1
     mechanism.verify.assert_not_called()
