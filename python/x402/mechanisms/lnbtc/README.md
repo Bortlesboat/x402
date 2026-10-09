@@ -79,3 +79,5 @@ Restrict invoice creation to trusted resource-server code and protect the receiv
 ## Validation
 
 From `python/x402`, run `uv run pytest tests/unit/mechanisms/lnbtc`. Tests use local signed invoices and the specification's published proof, with no node connection or real payment. They cover request mutations, payer failures, fresh concurrent challenges, durable replay rejection, and settlement before an HTTP handler. Real node interoperability remains an integration responsibility.
+
+`test_shared_vectors.py` also loads fixture version 1 from [`specs/schemes/exact/vectors/exact_lnbtc.json`](../../../../specs/schemes/exact/vectors/exact_lnbtc.json). The shared vectors and format were contributed in [#3727](https://github.com/x402-foundation/x402/pull/3727) at `63d5640d`. Open policy cases accept only the listed outcomes and preserve the configured-origin invariant.

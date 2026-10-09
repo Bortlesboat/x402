@@ -63,23 +63,18 @@ def validate_terms(requirements: PaymentRequirements, *, require_invoice: bool =
 
 
 def match_requirements(accepted: PaymentRequirements, required: PaymentRequirements) -> None:
-    if accepted.scheme != "exact" or required.scheme != "exact":
-        raise LightningValidationError("unsupported_scheme")
-    if accepted.network != required.network:
-        raise LightningValidationError("network_mismatch")
-    if accepted.asset != "BTC" or required.asset != "BTC":
-        raise invalid("asset")
-    validate_amount(accepted.amount)
-    validate_amount(required.amount)
     for attribute, reason in (
-        ("amount", "amount_mismatch"),
-        ("pay_to", "pay_to_mismatch"),
-        ("max_timeout_seconds", "max_timeout_mismatch"),
+        ("scheme", "unsupported_scheme"),
+        ("network", "network_mismatch"),
+        ("amount", "invalid_exact_lnbtc_amount_mismatch"),
+        ("asset", "invalid_exact_lnbtc_asset"),
+        ("pay_to", "invalid_exact_lnbtc_pay_to_mismatch"),
+        ("max_timeout_seconds", "invalid_exact_lnbtc_max_timeout_mismatch"),
     ):
         if getattr(accepted, attribute) != getattr(required, attribute):
-            raise invalid(reason)
-    validate_terms(required)
-    validate_terms(accepted)
+            raise LightningValidationError(reason)
+    validate_terms(required, require_invoice=False)
+    validate_terms(accepted, require_invoice=False)
     binding_keys = {"requestHash", "requestBindingProfile", "requestBindingParams"}
     for key in binding_keys:
         if canonical(accepted.extra[key]) != canonical(required.extra[key]):
@@ -89,6 +84,9 @@ def match_requirements(accepted: PaymentRequirements, required: PaymentRequireme
             continue
         if key not in accepted.extra or canonical(accepted.extra[key]) != canonical(value):
             raise invalid("extra_mismatch")
+    for extra in (required.extra, accepted.extra):
+        if not isinstance(extra.get("invoice"), str) or not extra["invoice"]:
+            raise invalid("invoice_missing")
 
 
 def decode_invoice(invoice: str) -> Bolt11:

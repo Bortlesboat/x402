@@ -54,7 +54,7 @@ def test_fresh_challenge_does_not_replace_accepted_invoice(proof, facilitator):
         ("scheme", "other", "unsupported_scheme"),
         ("network", TESTNET, "network_mismatch"),
         ("asset", "btc", "invalid_exact_lnbtc_asset"),
-        ("amount", "0", "invalid_exact_lnbtc_amount"),
+        ("amount", "0", "invalid_exact_lnbtc_amount_mismatch"),
         ("amount", "1", "invalid_exact_lnbtc_amount_mismatch"),
         ("pay_to", "bad", "invalid_exact_lnbtc_pay_to_mismatch"),
         ("max_timeout_seconds", 1, "invalid_exact_lnbtc_max_timeout_mismatch"),
