@@ -9,7 +9,6 @@ jobs:
   test-python:
     runs-on: ubuntu-latest
     env:
-      # Lightning's coincurve dependency has wheels through Python 3.13.
       UV_PYTHON: "3.13"
     defaults:
       run:
